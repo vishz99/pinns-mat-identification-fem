@@ -118,7 +118,7 @@ def solve_elasticity(domain, V, bc, a, L):
         petsc_options={
             "ksp_type": "preonly",
             "pc_type": "lu"         # LU factorisation is a direct solver: it decomposes K into a lower and upper triangular matrix and solves exactly.
-        },
+        }, ######## This is a linear static problem ############
         petsc_options_prefix="elasticity_" # prefix for PETSc options to avoid conflicts if we have multiple solvers in the same code
     )
     # Displacement field uh
@@ -211,7 +211,9 @@ def run_simulation(E, nu, traction=1e6):
     xx, yy = np.meshgrid(x_vals, y_vals)
     grid_points = np.column_stack([xx.ravel(), yy.ravel()])
 
-    # Sparse sensor points: 20 random locations fixed by a seed for reproducibility
+    # Sparse sensor points: 20 random locations fixed by a seed for reproducibility.
+    # This would be the sam 20 points for all the 200 cases. 
+    # The inputs to the inverse solver are the coordinates and the output is the displacements at those coordinates.
     rng = np.random.default_rng(seed=42)
     sensor_points = rng.uniform(
         low  = [0.05, 0.05],
@@ -246,3 +248,13 @@ if __name__ == "__main__":
     u_x_analytical = (traction * L) / E_test
     print(f"Analytical u_x estimate          : {u_x_analytical:.6e} m")
     print(f"Difference                       : {abs(u_grid[:, 0].max() - u_x_analytical):.6e} m")
+
+## To run this file:
+## scripts\run_fenics.bat forward_solver.py
+##
+## This runs the script inside the FEniCS Docker container.
+## It executes a single forward simulation with steel-like properties
+## (E = 200 GPa, nu = 0.3) and prints the resulting displacement field
+## statistics alongside an analytical validation check.
+## Use this to verify the forward solver is working correctly
+## before running the full dataset generation.

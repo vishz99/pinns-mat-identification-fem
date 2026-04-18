@@ -1,0 +1,3 @@
+@echo off
+echo Running FEniCS script inside Docker...
+docker run --rm -v "%CD%":/home/user -w /home/user/fenics dolfinx/dolfinx:stable bash -c "pip install h5py -q && python3 %1"
