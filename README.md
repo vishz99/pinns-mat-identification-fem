@@ -1,6 +1,6 @@
 # PINN-Based Inverse Solver for Material Parameter Recovery in 2D Linear Elasticity
 
-A Physics-Informed Neural Network that recovers elastic material parameters — Young's modulus E and Poisson's ratio ν — from sparse displacement observations by embedding the 2D linear elasticity PDE directly into the training loss.
+A Physics-Informed Neural Network that recovers elastic material parameters: Young's modulus E and Poisson's ratio ν, from sparse displacement observations by embedding the 2D linear elasticity PDE directly into the training loss.
 
 ---
 
