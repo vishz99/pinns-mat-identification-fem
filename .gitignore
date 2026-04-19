@@ -1,3 +1,5 @@
 docs/
 .vscode/
 data/
+pinns-mat-identification-fem.code-workspace
+fenics/__pycache__/
