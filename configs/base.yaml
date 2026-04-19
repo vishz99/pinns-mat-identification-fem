@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PINN Inverse Material Identification — Base Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# All hyperparameters for the PINN training loop are defined here.
+# No values are hardcoded in the training scripts.
+# This file is saved alongside every model checkpoint for full reproducibility.
+#
+# To run forward mode (Phase 2):
+#   python pinn/train.py --config configs/base.yaml
+#
+# To run inverse mode (Phase 3):
+#   python pinn/train.py --config configs/base.yaml --inverse
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── Network architecture ──────────────────────────────────────────────────────
+n_hidden: 5           # number of hidden layers
+n_neurons: 128        # neurons per hidden layer
+                      # total parameters ≈ 2*128 + 4*(128*128) + 128*2 = 66,560
+
+
+# ── Training ──────────────────────────────────────────────────────────────────
+n_epochs: 20000       # total training epochs
+learning_rate: 1.0e-3 # Adam initial learning rate
+scheduler_patience: 500  # epochs without improvement before lr is halved
+log_every: 500        # print loss summary every N epochs
+
+
+# ── Sampling ──────────────────────────────────────────────────────────────────
+n_collocation: 5000   # interior collocation points resampled each epoch
+n_boundary: 100       # points per boundary edge resampled each epoch
+                      # total boundary points = 4 * n_boundary = 400
+
+
+# ── Physics ───────────────────────────────────────────────────────────────────
+traction: 1.0e6       # applied horizontal traction on right edge in Pa (1 MPa)
+
+
+# ── Loss weights ──────────────────────────────────────────────────────────────
+# These balance the four loss terms which have different units and magnitudes.
+# Higher weight on Dirichlet and data terms anchors the solution (displacement) scale.
+# Tune these if one loss term dominates or fails to decrease during training.
+lambda_pde:  1.0
+lambda_dir:  10.0
+lambda_neu:  1.0
+lambda_data: 10.0
+
+
+# ── Forward mode parameters (Phase 2) ────────────────────────────────────────
+# Fixed known values used when inverse_mode=False.
+# Set to steel-like properties for initial validation.
+E_true:  200.0e9      # Young's modulus in Pa (200 GPa — steel)
+nu_true: 0.3          # Poisson's ratio
+
+
+# ── Inverse mode parameters (Phase 3) ────────────────────────────────────────
+# Initial guesses for E and nu when inverse_mode=True.
+# Deliberately offset from true values to test recovery.
+# E_init is intentionally set 25% below E_true to test convergence.
+E_init:  150.0e9      # initial guess for Young's modulus in Pa
+nu_init: 0.25         # initial guess for Poisson's ratio
+
+
+# ── Dataset ───────────────────────────────────────────────────────────────────
+dataset_path: data/dataset.h5   # path to HDF5 dataset generated in Phase 1
+sim_index: 0                    # which simulation to use for forward validation
+                                # index into the 200 simulations in the dataset
