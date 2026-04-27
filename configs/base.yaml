@@ -33,7 +33,7 @@ n_boundary: 100       # points per boundary edge resampled each epoch
 
 
 # ── Physics ───────────────────────────────────────────────────────────────────
-traction: 1.0e6       # applied horizontal traction on right edge in Pa (1 MPa)
+traction: 1000000.0        # applied horizontal traction on right edge in Pa (1 MPa)
 
 
 # ── Loss weights ──────────────────────────────────────────────────────────────

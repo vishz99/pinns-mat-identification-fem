@@ -11,6 +11,14 @@
 
 import torch
 
+# ── Normalisation constants ───────────────────────────────────────────────────
+# All loss terms are normalised to order 1 before weighting.
+# Without normalisation, stress values (~1e11) and displacement values (~1e-6)
+# differ by 17 orders of magnitude, making loss balancing impossible.
+U_SCALE = 1e-6    # displacement scale in metres
+S_SCALE = 1e6     # stress scale in Pascals (= traction magnitude)
+E_SCALE = 1e11    # stiffness scale in Pascals
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # KINEMATICS AND CONSTITUTIVE LAW
@@ -63,30 +71,42 @@ def compute_strain(u_x, u_y, xy):
 
 def compute_stress(eps_xx, eps_yy, eps_xy, E, nu):
     """
-    Computes the plane stress components from strain using Hooke's law.
+    Computes normalised plane stress components from strain using Hooke's law.
 
     Plane stress constitutive law:
         σ_xx = E/(1-ν²) * (ε_xx + ν*ε_yy)
         σ_yy = E/(1-ν²) * (ε_yy + ν*ε_xx)
         σ_xy = E/(1+ν)  * ε_xy
 
+    Normalisation:
+        Network outputs normalised displacements (divided by U_SCALE).
+        Autograd gives strain in units of U_SCALE/metre.
+        Physical stress = E * physical_strain.
+        Normalised stress = physical_stress / S_SCALE.
+        Combined scale = E_SCALE * U_SCALE / S_SCALE = 1e11*1e-6/1e6 = 0.1
+
+    Returned stresses are order 0.1 to 0.3 — suitable for loss computation.
+
     Parameters
     ----------
-    eps_xx, eps_yy, eps_xy : torch.Tensor — strain components
-    E  : float or torch.Tensor — Young's modulus in Pa ###############
-    nu : float or torch.Tensor — Poisson's ratio       ###############
+    eps_xx, eps_yy, eps_xy : strain components (normalised)
+    E  : float or torch.Tensor — Young's modulus in Pa (unnormalised)
+    nu : float or torch.Tensor — Poisson's ratio (dimensionless, no scaling)
 
     Returns
     -------
-    sig_xx, sig_yy, sig_xy : torch.Tensor — stress components in Pa
+    sig_xx, sig_yy, sig_xy : normalised stress components (order 1)
     """
-    factor = E / (1.0 - nu ** 2)
+    E_norm = E / E_SCALE
+    scale  = E_SCALE * U_SCALE / S_SCALE   # = 0.1
+
+    factor = scale * E_norm / (1.0 - nu ** 2)
 
     sig_xx = factor * (eps_xx + nu * eps_yy)
     sig_yy = factor * (eps_yy + nu * eps_xx)
-    sig_xy = (E / (1.0 + nu)) * eps_xy
+    sig_xy = scale * E_norm / (1.0 + nu) * eps_xy
 
-    return sig_xx, sig_yy, sig_xy 
+    return sig_xx, sig_yy, sig_xy
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LOSS TERMS
@@ -243,7 +263,8 @@ def loss_neumann(model, xy_right, xy_top, xy_bottom, E, nu, traction=1e6):
         u_x, u_y = uv[:, 0:1], uv[:, 1:2]
         eps_xx, eps_yy, eps_xy = compute_strain(u_x, u_y, xy)
         sig_xx, sig_yy, sig_xy = compute_stress(eps_xx, eps_yy, eps_xy, E, nu)
-        return torch.mean((sig_xx - traction) ** 2 + sig_xy ** 2)
+        traction_norm = traction / S_SCALE   # normalised traction = 1.0
+        return torch.mean((sig_xx - traction_norm) ** 2 + sig_xy ** 2)  
 
     def traction_residuals_free(xy):
         uv = model(xy)
@@ -300,8 +321,9 @@ def loss_data(model, xy_sensors, u_obs):
     -------
     torch.Tensor — scalar data-fit loss value
     """
-    uv_pred = model(xy_sensors)
-    return torch.mean((uv_pred - u_obs) ** 2)
+    u_obs_norm = u_obs / U_SCALE    # normalise observations to match network output scale
+    uv_pred    = model(xy_sensors)
+    return torch.mean((uv_pred - u_obs_norm) ** 2)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

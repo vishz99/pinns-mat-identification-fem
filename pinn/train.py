@@ -7,6 +7,11 @@
 ## To run:
 ##   python pinn/train.py --config configs/base.yaml
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "."))
+# ^ These are relative imports that assume the working directory is pinn/. 
+# But I am running from the project root, so Python will not find those files.
 import torch
 import numpy as np
 import yaml
@@ -141,8 +146,7 @@ def train(config, E_true=None, nu_true=None,
         optimiser,
         mode="min",
         factor=0.5,
-        patience=config["scheduler_patience"],
-        verbose=True
+        patience=config["scheduler_patience"]
     )
 
     # ── Loss weights ─────────────────────────────────────────────────────────
@@ -329,9 +333,10 @@ if __name__ == "__main__":
         # Full displacement field for post-training validation
         grid_xy   = f["metadata"]["grid_points"][()]     # shape (1000, 2)
         u_grid    = f["simulations"][sim_key]["u_grid"][()] # shape (1000, 2)
+        sim_split = f["simulations"][sim_key].attrs["split"]
 
     print(f"Simulation {sim_key} — E: {E_true:.3e} Pa, nu: {nu_true:.4f}")
-    print(f"Split: {h5py.File(dataset_path, 'r')['simulations'][sim_key].attrs['split']}")
+    print(f"Split: {sim_split}")
 
     # Convert sensor data to tensors for training
     xy_sensors_tensor = torch.tensor(sensor_xy, dtype=torch.float32)
@@ -353,3 +358,65 @@ if __name__ == "__main__":
     )
 
     print("\nDone.")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# USAGE GUIDE
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# FORWARD MODE (Phase 2)
+# ──────────────────────
+# E and nu are fixed known values loaded from the dataset.
+# The network learns the displacement field using physics alone —
+# no sensor observations are used.
+# Purpose: verify the PDE loss implementation is correct before
+# attempting parameter recovery. If the PINN cannot reproduce the
+# FEniCS field with known material parameters, something is wrong
+# in the loss function — fix it here before moving to inverse mode.
+#
+# Input    : (x, y) spatial coordinates — sampled randomly inside the domain
+#            E and nu — fixed known values loaded from the dataset (not learned)
+#
+# Output   : Trained displacement field u(x, y) = (u_x, u_y)
+#            Loss curves for L_pde, L_dir, L_neu, L_total
+#            best_model.pt checkpoint and history.json saved to outputs/
+#
+# Recovered: Nothing — E and nu are fixed. Success means the predicted
+#            displacement field visually matches the FEniCS ground truth.
+#
+#   python pinn/train.py --config configs/base.yaml
+#
+#
+# INVERSE MODE (Phase 3)
+# ──────────────────────
+# E and nu are unknown — initialised to a guess and made learnable.
+# The network simultaneously learns the displacement field AND recovers
+# the material parameters from 20 sparse sensor observations.
+# The data-fit loss term activates and drives E and nu to their true values.
+# Only run this after forward mode has been validated successfully.
+# Input    : (x, y) spatial coordinates — sampled randomly inside the domain
+#            u_sensors — 20 observed displacements loaded from the dataset
+#            E_init, nu_init — initial guesses defined in configs/base.yaml
+#
+# Output   : Trained displacement field u(x, y) = (u_x, u_y)
+#            Recovered E and nu values printed every log_every epochs
+#            Loss curves for L_pde, L_dir, L_neu, L_data, L_total
+#            best_model.pt checkpoint and history.json saved to outputs/
+#
+# Recovered: E (Young's modulus in Pa) and nu (Poisson's ratio)
+#            Recovery error printed as percentage against true values
+#            Parameter convergence history saved in history.json
+#
+#   python pinn/train.py --config configs/base.yaml --inverse
+#
+#
+# VISUALISING RESULTS
+# ───────────────────
+# After training, a run folder is created under outputs/checkpoints/RUN_ID/
+# containing best_model.pt and history.json. Pass these to visualize.py:
+#
+#   python pinn/visualize.py --history outputs/checkpoints/RUN_ID/history.json
+#                            --dataset data/dataset.h5
+#                            --sim_index 0
+#
+# ═══════════════════════════════════════════════════════════════════════════
