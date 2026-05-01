@@ -113,27 +113,22 @@ def plot_displacement_comparison(model_path, dataset_path, sim_index, save_dir):
     Compares the PINN predicted displacement field against the FEniCS
     ground truth on the dense 40x25 evaluation grid.
 
-    Plots four panels:
-        u_x FEniCS    — ground truth horizontal displacement
-        u_x PINN      — network predicted horizontal displacement
-        u_y FEniCS    — ground truth vertical displacement
-        u_y PINN      — network predicted vertical displacement
+    Plots six panels in two rows:
+        Row 1: u_x FEniCS | u_x PINN | u_x Absolute Error
+        Row 2: u_y FEniCS | u_y PINN | u_y Absolute Error
 
-    The two fields should look nearly identical if the PINN has converged.
-    Large visible differences indicate insufficient training or loss
-    weight issues that need tuning.
+    The error panels show pointwise |u_PINN - u_FEniCS| in metres,
+    making deviations quantitative rather than purely visual.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Load checkpoint
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     config     = checkpoint["config"]
 
     model = PINN(n_hidden=config["n_hidden"], n_neurons=config["n_neurons"]).to(device)
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
 
-    # Load FEniCS ground truth
     sim_key = f"sim_{sim_index:04d}"
     with h5py.File(dataset_path, "r") as f:
         grid_xy = f["metadata"]["grid_points"][()]
@@ -141,40 +136,64 @@ def plot_displacement_comparison(model_path, dataset_path, sim_index, save_dir):
         E_true  = float(f["simulations"][sim_key]["E"][()])
         nu_true = float(f["simulations"][sim_key]["nu"][()])
 
-    # PINN prediction on grid
     xy_tensor = torch.tensor(grid_xy, dtype=torch.float32).to(device)
     with torch.no_grad():
-        uv_pred = model(xy_tensor).cpu().numpy()
+        uv_pred_norm = model(xy_tensor).cpu().numpy()
 
-    # Reshape to 2D grid for plotting (25 rows x 40 cols)
-    x = grid_xy[:, 0].reshape(25, 40)
-    y = grid_xy[:, 1].reshape(25, 40)
-    ux_fem  = u_grid[:, 0].reshape(25, 40)
-    uy_fem  = u_grid[:, 1].reshape(25, 40)
-    ux_pinn = uv_pred[:, 0].reshape(25, 40)
-    uy_pinn = uv_pred[:, 1].reshape(25, 40)
+    # Denormalise network output back to physical units
+    U_SCALE    = 1e-6
+    uv_pred    = uv_pred_norm * U_SCALE
 
-    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+    # Reshape to 2D grid (25 rows x 40 cols)
+    x        = grid_xy[:, 0].reshape(25, 40)
+    y        = grid_xy[:, 1].reshape(25, 40)
+    ux_fem   = u_grid[:, 0].reshape(25, 40)
+    uy_fem   = u_grid[:, 1].reshape(25, 40)
+    ux_pinn  = uv_pred[:, 0].reshape(25, 40)
+    uy_pinn  = uv_pred[:, 1].reshape(25, 40)
+
+    # Absolute error
+    err_ux   = np.abs(ux_pinn - ux_fem)
+    err_uy   = np.abs(uy_pinn - uy_fem)
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 8))
     fig.suptitle(
         f"Displacement Field Comparison — sim_{sim_index:04d}\n"
         f"E = {E_true/1e9:.2f} GPa,  ν = {nu_true:.4f}",
         fontsize=13, fontweight="bold"
     )
 
-    panels = [
-        (axes[0, 0], ux_fem,  "u_x — FEniCS (ground truth)", "m"),
-        (axes[0, 1], ux_pinn, "u_x — PINN prediction",       "m"),
-        (axes[1, 0], uy_fem,  "u_y — FEniCS (ground truth)", "m"),
-        (axes[1, 1], uy_pinn, "u_y — PINN prediction",       "m"),
+    # Row 1 — u_x
+    panels_ux = [
+        (axes[0, 0], ux_fem,  "u_x — FEniCS (ground truth)", "RdBu_r", False),
+        (axes[0, 1], ux_pinn, "u_x — PINN prediction",       "RdBu_r", False),
+        (axes[0, 2], err_ux,  "u_x — Absolute Error",        "YlOrRd",  True),
     ]
 
-    for ax, data, title, unit in panels:
-        cf = ax.contourf(x, y, data, levels=50, cmap="RdBu_r")
-        plt.colorbar(cf, ax=ax, label=unit)
-        ax.set_title(title, fontweight="bold")
-        ax.set_xlabel("x (m)")
-        ax.set_ylabel("y (m)")
+    # Row 2 — u_y
+    panels_uy = [
+        (axes[1, 0], uy_fem,  "u_y — FEniCS (ground truth)", "RdBu_r", False),
+        (axes[1, 1], uy_pinn, "u_y — PINN prediction",       "RdBu_r", False),
+        (axes[1, 2], err_uy,  "u_y — Absolute Error",        "YlOrRd",  True),
+    ]
+
+    for ax, data, title, cmap, is_error in panels_ux + panels_uy:
+        cf = ax.contourf(x, y, data, levels=50, cmap=cmap)
+        cb = plt.colorbar(cf, ax=ax)
+        cb.set_label("m", fontsize=9)
+        ax.set_title(title, fontweight="bold", fontsize=10)
+        ax.set_xlabel("x (m)", fontsize=9)
+        ax.set_ylabel("y (m)", fontsize=9)
         ax.set_aspect("equal")
+        if is_error:
+            # Print max error in the corner for quick reference
+            ax.text(0.97, 0.03,
+                    f"max: {data.max():.2e} m",
+                    transform=ax.transAxes,
+                    ha="right", va="bottom",
+                    fontsize=8, color="white",
+                    bbox=dict(boxstyle="round,pad=0.2",
+                              facecolor="black", alpha=0.5))
 
     plt.tight_layout()
     path = os.path.join(save_dir, "displacement_comparison.png")

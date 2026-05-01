@@ -64,5 +64,5 @@ nu_init: 0.30        # initial guess for Poisson's ratio
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 dataset_path: data/dataset.h5   # path to HDF5 dataset generated in Phase 1
-sim_index: 2                    # which simulation to use for forward validation
+sim_index: 8                    # which simulation to use for forward validation
                                 # index into the 200 simulations in the dataset

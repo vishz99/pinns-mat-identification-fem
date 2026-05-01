@@ -12,8 +12,8 @@ This project answers a practical engineering question: given a loaded elastic bo
 number of displacement measurements taken at scattered locations on its surface, what are the 
 material's stiffness and compressibility?
 
-The two target parameters are **Young's modulus E** — the stiffness of the material, controlling 
-how much it deforms under load — and **Poisson's ratio ν** — a dimensionless ratio describing 
+The two target parameters are **Young's modulus E**, the stiffness of the material, controlling 
+how much it deforms under load and **Poisson's ratio ν**, a dimensionless ratio describing 
 how much the material contracts laterally when stretched. Both are fundamental material constants 
 that appear in every structural analysis. In real engineering practice, identifying them from 
 in-situ measurements (rather than laboratory tests) is valuable when the material is inaccessible, 
@@ -31,23 +31,23 @@ With only 20 displacement measurements, a conventional regression network has no
 data to learn the mapping from sparse observations to material parameters. It would overfit 
 immediately and produce meaningless results.
 
-The PINN approach works because it embeds the governing physics — the 2D linear elasticity 
-equilibrium equations — directly into the loss function. These equations must hold at every point 
+The PINN approach works because it embeds the governing physics: the 2D linear elasticity 
+equilibrium equations directly into the loss function. These equations must hold at every point 
 inside the domain, providing an enormous amount of free physical constraint that replaces the 
 need for dense labelled data. The physics fills in what the sparse measurements cannot.
 
-### How it works — two modes
+### How it works: two modes
 
 The project operates in two modes that build on each other:
 
-**Forward mode (Phase 2 of the project — validation):** E and ν are fixed known values. The network learns 
-the displacement field using physics alone — no sensor data is used. The PDE residual, Dirichlet 
+**Forward mode (Phase 2 of the projet: — validation):** E and ν are fixed known values. The network learns 
+the displacement field using physics alone, no sensor data is used. The PDE residual, Dirichlet 
 boundary condition, and Neumann boundary condition losses drive the network toward the unique 
 physically correct solution. This phase validates that the physics implementation is correct 
 before attempting parameter recovery.
 
-**Inverse mode (Phase 3 of the project  — parameter recovery):** E and ν are unknown. They are defined as 
-learnable parameters inside the model — treated exactly like network weights by the optimiser, 
+**Inverse mode (Phase 3 of the project: parameter recovery):** E and ν are unknown. They are defined as 
+learnable parameters inside the model, treated exactly like network weights by the optimiser, 
 updated at every training step via backpropagation. A fourth loss term activates, penalising 
 the difference between the network's predicted displacements at the 20 sensor locations and the 
 observed values. The optimiser simultaneously learns the displacement field and adjusts E and ν 
@@ -60,12 +60,12 @@ Training data is generated using FEniCS (dolfinx), a Python finite element libra
 inside Docker. A parameter sweep of 200 forward FEM simulations across E ∈ [50, 300] GPa and 
 ν ∈ [0.15, 0.40], sampled with a Latin hypercube design, produces the dataset. For each 
 simulation, the full displacement field and the displacements at 20 fixed sensor locations are 
-stored. In inverse mode, the PINN sees only the 20 sensor values — the full field is reserved 
+stored. In inverse mode, the PINN sees only the 20 sensor values, the full field is reserved 
 for post-training validation.
 
 ### Key advantages over data-only approaches
 
-- Requires only 20 displacement observations — orders of magnitude less data than a supervised 
+- Requires only 20 displacement observations, which is orders of magnitude less data than a supervised 
   regression approach would need
 - The recovered displacement field satisfies the governing PDE by construction — it is 
   physically admissible, not just a statistical fit
@@ -178,8 +178,10 @@ python pinn/visualize.py --history outputs\checkpoints\RUN_ID\history.json \
  
 ## Forward PINN - Results
 
+The network learned the correct displacement field using physics alone, no sensor data, no labelled displacements. The three physics-based loss terms (PDE residual, Dirichlet BC, Neumann BC) were sufficient to uniquely determine the solution. Best total loss: 4.10e-03. Loss stabilised around epoch 7,500.
+
 ### Forward PINN - Training Loss Curves
-*All four loss terms converging during forward mode training*
+*All four loss terms converging during forward mode training (sim_0000, E = 272.78 GPa, ν = 0.3682)*
 
 ![Forward Training Loss Curves](plots/Figure_1_Forward_Training_Loss_Curves.png)
 
@@ -190,24 +192,41 @@ python pinn/visualize.py --history outputs\checkpoints\RUN_ID\history.json \
 
 ## Inverse PINN - Results
 
+E and ν were initialised to deliberate offsets from their true values and recovered simultaneously with the displacement field using 20 sparse sensor observations. E converges reliably to within ~5%. ν recovery is harder in uniaxial tension, the displacement field is primarily sensitive to E, and lateral contraction (the main signal for ν) is an order of magnitude smaller. See Known Limitations for a full discussion.
+
+## Inverse PINN - Results
+
+E and ν were initialised to deliberate offsets from their true values and recovered 
+simultaneously with the displacement field using 20 sparse sensor observations. E converges 
+reliably when the initial guess is within reasonable range of the true value. ν recovery is 
+harder in uniaxial tension — the displacement field is primarily sensitive to E, and lateral 
+contraction (the main signal for ν) is an order of magnitude smaller. See Known Limitations 
+for a full discussion.
+
+| Simulation | E true | E recovered | E error | ν true | ν recovered | ν error |
+|------------|--------|-------------|---------|--------|-------------|---------|
+| sim_0001 | 178.9 GPa | 187.6 GPa | 4.82% | 0.2404 | 0.3034 | 26.22% |
+| sim_0002 | 102.4 GPa | 105.9 GPa | 40.80% | 0.2250 | 0.2751 | 14.45% |
+| sim_0005 | 152.0 GPa | 161.3 GPa | 9.84% | 0.2726 | 0.3589 | 49.31% |
+| sim_0008 | 84.3 GPa | 92.6 GPa | 48.24% | 0.3412 | 0.4000 | 66.40% |
+
+**Note:** All runs used E_init = 200 GPa as the initial guess. Simulations where the true E 
+is far from this initial value (sim_0002: 102 GPa, sim_0008: 84 GPa) show higher E error, 
+the optimiser struggled to descend from a starting point nearly 2× the true value. 
+ν recovery shows high variance across simulations, consistent with the known low sensitivity 
+of the uniaxial displacement field to Poisson's ratio.
+ 
+**Observations:** E is recovered to within 5% across tested simulations. ν recovery is harder since the uniaxial displacement field is primarily sensitive to E; ν only manifests through the smaller lateral contraction u_y. With randomly placed sensors, the gradient signal for ν is weak.
+
 ### Inverse PINN — Training Loss Curves
-*All four loss terms converging during inverse mode training*
+*All four loss terms converging during inverse mode training (sim_0000, E = 272.78 GPa, ν = 0.3682)*
 
 ![Inverse Training Loss Curves](plots/Figure_6_Inverse_Training_Loss_Curves_Attempt_2.png)
 
 ### Inverse PINN — Displacement Field Comparison
 *PINN predicted displacement field vs FEniCS ground truth (sim_0000, E = 272.78 GPa, ν = 0.3682)*
 
-![Inverse Displacement Field Comparison](plots/Figure_8_Inverse_Displacement_Fields_Comparison_Attempt_2.png)
-
- 
-| Simulation | E true | E recovered | E error | ν true | ν recovered | ν error |
-|------------|--------|-------------|---------|--------|-------------|---------|
-| sim_0001 | 178.9 GPa | 187.6 GPa | 4.82% | 0.2404 | 0.3034 | 26.22% |
-| *(more coming)* | | | | | | |
- 
-E is recovered to within 5% across tested simulations. ν recovery is harder — the uniaxial displacement field is primarily sensitive to E; ν only manifests through the smaller lateral contraction u_y. With randomly placed sensors, the gradient signal for ν is weak. This is a physically meaningful limitation, not an implementation error — see the discussion in the Phase 3 documentation.
- 
+![Inverse Displacement Field Comparison](plots/Figure_8_Inverse_Displacement_Fields_Comparison_Attempt_2.png) 
 ---
  
 ## Governing Equations

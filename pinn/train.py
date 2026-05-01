@@ -9,8 +9,6 @@
 
 import sys
 import os
-
-from pinn import visualize
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 # ^ These are relative imports that assume the working directory is pinn/. 
 # But I am running from the project root, so Python will not find those files.
@@ -433,4 +431,4 @@ if __name__ == "__main__":
 #
 # ═══════════════════════════════════════════════════════════════════════════
 # Example:
-# python pinn/visualize.py --history outputs\checkpoints\20260501_083123\history.json --dataset data\dataset.h5 --sim_index 1
+# python pinn/visualize.py --history outputs\checkpoints\20260501_102710\history.json --dataset data\dataset.h5 --sim_index 1
