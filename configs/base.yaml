@@ -21,7 +21,7 @@ n_neurons: 128        # neurons per hidden layer
 
 # ── Training ──────────────────────────────────────────────────────────────────
 n_epochs: 20000       # total training epochs
-learning_rate: 1.0e-3 # Adam initial learning rate
+learning_rate: 5.0e-4 # Adam initial learning rate
 scheduler_patience: 500  # epochs without improvement before lr is halved
 log_every: 500        # print loss summary every N epochs
 
@@ -43,7 +43,8 @@ traction: 1000000.0        # applied horizontal traction on right edge in Pa (1 
 lambda_pde:  1.0
 lambda_dir:  10.0
 lambda_neu:  1.0
-lambda_data: 10.0
+lambda_data: 50.0
+
 
 
 # ── Forward mode parameters (Phase 2) ────────────────────────────────────────
@@ -57,11 +58,11 @@ nu_true: 0.3          # Poisson's ratio
 # Initial guesses for E and nu when inverse_mode=True.
 # Deliberately offset from true values to test recovery.
 # E_init is intentionally set 25% below E_true to test convergence.
-E_init:  150.0e9      # initial guess for Young's modulus in Pa
-nu_init: 0.25         # initial guess for Poisson's ratio
+E_init:  200000000000.0          # initial guess for Young's modulus in Pa
+nu_init: 0.30        # initial guess for Poisson's ratio
 
 
 # ── Dataset ───────────────────────────────────────────────────────────────────
 dataset_path: data/dataset.h5   # path to HDF5 dataset generated in Phase 1
-sim_index: 0                    # which simulation to use for forward validation
+sim_index: 2                    # which simulation to use for forward validation
                                 # index into the 200 simulations in the dataset

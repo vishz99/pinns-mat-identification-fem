@@ -3,3 +3,4 @@ docs/
 data/
 pinns-mat-identification-fem.code-workspace
 fenics/__pycache__/
+outputs/

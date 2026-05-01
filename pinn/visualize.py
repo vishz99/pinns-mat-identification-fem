@@ -7,6 +7,7 @@
 ##                            --dataset data/dataset.h5
 ##                            --sim_index 0
 ## python pinn/visualize.py --history outputs\checkpoints\20260424_160659\history.json --dataset data\dataset.h5 --sim_index 0
+## python pinn/visualize.py --history outputs\checkpoints\20260427_215848\history.json --dataset data\dataset.h5 --sim_index 0
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))

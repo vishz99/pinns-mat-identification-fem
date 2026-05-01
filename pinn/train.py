@@ -9,6 +9,8 @@
 
 import sys
 import os
+
+from pinn import visualize
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 # ^ These are relative imports that assume the working directory is pinn/. 
 # But I am running from the project root, so Python will not find those files.
@@ -210,11 +212,21 @@ def train(config, E_true=None, nu_true=None,
             lambda_neu=lam_neu,
             lambda_data=lam_data
         )
+        """
+        Added new!
+        """
+        # Soft constraint: penalise nu outside physical range [0.15, 0.40]
+        # nu_penalty = (torch.relu(nu - 0.40) + torch.relu(0.15 - nu)) ** 2
+        # loss = loss + 100.0 * nu_penalty
 
         # Backward pass and optimiser step
         loss.backward()
         optimiser.step()
         scheduler.step(loss)
+
+        # Hard clamp nu to physical range after each optimiser step
+        with torch.no_grad():
+            nu.clamp_(0.15, 0.40)
 
         # ── Logging ──────────────────────────────────────────────────────────
         for key, val in parts.items():
@@ -420,3 +432,5 @@ if __name__ == "__main__":
 #                            --sim_index 0
 #
 # ═══════════════════════════════════════════════════════════════════════════
+# Example:
+# python pinn/visualize.py --history outputs\checkpoints\20260501_083123\history.json --dataset data\dataset.h5 --sim_index 1
