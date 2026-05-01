@@ -181,22 +181,24 @@ python pinn/visualize.py --history outputs\checkpoints\RUN_ID\history.json \
 ### Forward PINN - Training Loss Curves
 *All four loss terms converging during forward mode training*
 
-![Forward Training Loss Curves](plots\Figure_1_Forward_Training_Loss_Curves.png)
+![Forward Training Loss Curves](plots/Figure_1_Forward_Training_Loss_Curves.png)
 
 ### Forward PINN - Displacement Field Comparison
 *PINN predicted displacement field vs FEniCS ground truth (sim_0000, E = 272.78 GPa, ν = 0.3682)*
-![Forward Displacement Field Comparison](plots\Figure_2_Forward_Displacement_Fields_Comparison.png)
+
+![Forward Displacement Field Comparison](plots/Figure_2_Forward_Displacement_Fields_Comparison.png)
 
 ## Inverse PINN - Results
 
 ### Inverse PINN — Training Loss Curves
 *All four loss terms converging during inverse mode training*
 
-![Inverse Training Loss Curves](plots\Figure_6_Inverse_Training_Loss_Curves_Attempt_2.png)
+![Inverse Training Loss Curves](plots/Figure_6_Inverse_Training_Loss_Curves_Attempt_2.png)
 
 ### Inverse PINN — Displacement Field Comparison
 *PINN predicted displacement field vs FEniCS ground truth (sim_0000, E = 272.78 GPa, ν = 0.3682)*
-![Inverse Displacement Field Comparison](plots\Figure_8_Inverse_Displacement_Fields_Comparison_Attempt_2.png)
+
+![Inverse Displacement Field Comparison](plots/Figure_8_Inverse_Displacement_Fields_Comparison_Attempt_2.png)
 
  
 | Simulation | E true | E recovered | E error | ν true | ν recovered | ν error |
