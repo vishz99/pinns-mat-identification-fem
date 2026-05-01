@@ -6,9 +6,72 @@ A Physics-Informed Neural Network that recovers elastic material parameters: You
 
 ## Introduction
 
-This project implements a PINN-based inverse solver for 2D linear elasticity in PyTorch. A feedforward neural network represents the displacement field as a continuous function of spatial coordinates; automatic differentiation computes strain and stress exactly, and the equilibrium PDE is enforced at collocation points throughout the domain. Material parameters E and ν are recovered simultaneously with the displacement field by treating them as learnable scalars optimised against sparse FEM-generated displacement observations.
+### What this project does
 
-Ground truth data is generated using FEniCS (dolfinx), a Python finite element library running inside Docker. A parameter sweep of 200 simulations across Young's modulus E ∈ [50, 300] GPa and Poisson's ratio ν ∈ [0.15, 0.40], sampled using a Latin hypercube design, produces the training and test dataset stored in HDF5 format.
+This project answers a practical engineering question: given a loaded elastic body and a small 
+number of displacement measurements taken at scattered locations on its surface, what are the 
+material's stiffness and compressibility?
+
+The two target parameters are **Young's modulus E** — the stiffness of the material, controlling 
+how much it deforms under load — and **Poisson's ratio ν** — a dimensionless ratio describing 
+how much the material contracts laterally when stretched. Both are fundamental material constants 
+that appear in every structural analysis. In real engineering practice, identifying them from 
+in-situ measurements (rather than laboratory tests) is valuable when the material is inaccessible, 
+inhomogeneous, or has degraded in service.
+
+**Inputs:** spatial coordinates (x, y) inside a 2D rectangular elastic domain, plus a small set 
+of displacement observations at 20 sparse sensor locations.
+
+**Outputs:** the full displacement field u(x, y) = (u_x, u_y) across the domain, and the 
+recovered material parameters E and ν.
+
+### Why a standard neural network cannot do this
+
+With only 20 displacement measurements, a conventional regression network has nowhere near enough 
+data to learn the mapping from sparse observations to material parameters. It would overfit 
+immediately and produce meaningless results.
+
+The PINN approach works because it embeds the governing physics — the 2D linear elasticity 
+equilibrium equations — directly into the loss function. These equations must hold at every point 
+inside the domain, providing an enormous amount of free physical constraint that replaces the 
+need for dense labelled data. The physics fills in what the sparse measurements cannot.
+
+### How it works — two modes
+
+The project operates in two modes that build on each other:
+
+**Forward mode (Phase 2 of the project — validation):** E and ν are fixed known values. The network learns 
+the displacement field using physics alone — no sensor data is used. The PDE residual, Dirichlet 
+boundary condition, and Neumann boundary condition losses drive the network toward the unique 
+physically correct solution. This phase validates that the physics implementation is correct 
+before attempting parameter recovery.
+
+**Inverse mode (Phase 3 of the project  — parameter recovery):** E and ν are unknown. They are defined as 
+learnable parameters inside the model — treated exactly like network weights by the optimiser, 
+updated at every training step via backpropagation. A fourth loss term activates, penalising 
+the difference between the network's predicted displacements at the 20 sensor locations and the 
+observed values. The optimiser simultaneously learns the displacement field and adjusts E and ν 
+until the field is both physically consistent and matches the sensor observations. The only 
+values of E and ν that satisfy both conditions are the true material parameters.
+
+### Ground truth data
+
+Training data is generated using FEniCS (dolfinx), a Python finite element library running 
+inside Docker. A parameter sweep of 200 forward FEM simulations across E ∈ [50, 300] GPa and 
+ν ∈ [0.15, 0.40], sampled with a Latin hypercube design, produces the dataset. For each 
+simulation, the full displacement field and the displacements at 20 fixed sensor locations are 
+stored. In inverse mode, the PINN sees only the 20 sensor values — the full field is reserved 
+for post-training validation.
+
+### Key advantages over data-only approaches
+
+- Requires only 20 displacement observations — orders of magnitude less data than a supervised 
+  regression approach would need
+- The recovered displacement field satisfies the governing PDE by construction — it is 
+  physically admissible, not just a statistical fit
+- E is recovered to within ~5% across tested simulations
+- The approach generalises naturally to more complex geometries, nonlinear materials, and 
+  richer sensor configurations without retraining from scratch
 
 ---
 
@@ -113,7 +176,28 @@ python pinn/visualize.py --history outputs\checkpoints\RUN_ID\history.json \
  
 ---
  
-## Key Results
+## Forward PINN - Results
+
+### Forward PINN - Training Loss Curves
+*All four loss terms converging during forward mode training*
+
+![Forward Training Loss Curves](plots\Figure_1_Forward_Training_Loss_Curves.png)
+
+### Forward PINN - Displacement Field Comparison
+*PINN predicted displacement field vs FEniCS ground truth (sim_0000, E = 272.78 GPa, ν = 0.3682)*
+![Forward Displacement Field Comparison](plots\Figure_2_Forward_Displacement_Fields_Comparison.png)
+
+## Inverse PINN - Results
+
+### Inverse PINN — Training Loss Curves
+*All four loss terms converging during inverse mode training*
+
+![Inverse Training Loss Curves](plots\Figure_6_Inverse_Training_Loss_Curves_Attempt_2.png)
+
+### Inverse PINN — Displacement Field Comparison
+*PINN predicted displacement field vs FEniCS ground truth (sim_0000, E = 272.78 GPa, ν = 0.3682)*
+![Inverse Displacement Field Comparison](plots\Figure_8_Inverse_Displacement_Fields_Comparison_Attempt_2.png)
+
  
 | Simulation | E true | E recovered | E error | ν true | ν recovered | ν error |
 |------------|--------|-------------|---------|--------|-------------|---------|
