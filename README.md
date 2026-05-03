@@ -83,7 +83,7 @@ for post-training validation.
 | 1 | FEniCS forward solver and dataset generation | Complete |
 | 2 | Forward PINN — validate PDE loss with known E and ν | Complete |
 | 3 | Inverse PINN — recover E and ν from sparse observations | Complete |
-| 4 | Repository cleanup, results notebook, and final documentation | Pending |
+| 4 | Repository cleanup, results notebook, and final documentation | Complete |
 
 ---
 
@@ -193,15 +193,6 @@ The network learned the correct displacement field using physics alone, no senso
 ## Inverse PINN - Results
 
 E and ν were initialised to deliberate offsets from their true values and recovered simultaneously with the displacement field using 20 sparse sensor observations. E converges reliably to within ~5%. ν recovery is harder in uniaxial tension, the displacement field is primarily sensitive to E, and lateral contraction (the main signal for ν) is an order of magnitude smaller. See Known Limitations for a full discussion.
-
-## Inverse PINN - Results
-
-E and ν were initialised to deliberate offsets from their true values and recovered 
-simultaneously with the displacement field using 20 sparse sensor observations. E converges 
-reliably when the initial guess is within reasonable range of the true value. ν recovery is 
-harder in uniaxial tension — the displacement field is primarily sensitive to E, and lateral 
-contraction (the main signal for ν) is an order of magnitude smaller. See Known Limitations 
-for a full discussion.
 
 | Simulation | E true | E recovered | E error | ν true | ν recovered | ν error |
 |------------|--------|-------------|---------|--------|-------------|---------|
